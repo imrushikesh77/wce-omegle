@@ -119,23 +119,26 @@ socket.on('chat message partner', function (msg) {
     messagesDiv.scrollTop = messagesDiv.scrollHeight;
 });
 
+// Consolidate disconnection handling into one event
+
 socket.on('disconnecting now', function (msg) {
     messagesDiv.innerHTML += '<div class="partner">' + msg + "</div>";
-    alert("Oops! your partner has disconnected, refreshing please wait.");
-    remoteVideo.srcObject = null;
-    window.location.reload();
-    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    // remoteVideo.srcObject = null;
     document.getElementById("m").style.pointerEvents = "none";
     document.getElementById("m").style.background = FORM_INPUT_DISABLED_COLOR;
     document.getElementById("submitButton").style.pointerEvents = "none";
     document.getElementById("submitButton").style.background = FORM_INPUT_DISABLED_COLOR;
     document.getElementById("m").placeholder = "";
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    // Optionally reload the page or handle other actions
+    window.location.reload(); // Uncomment if you want to reload the page
 });
 
 socket.on('disconnect', function () {
     remoteVideo.srcObject = null;
     partner_id = null;
 });
+
 
 socket.on('partner', function (partner_data) {
     if (partner_id == null) {

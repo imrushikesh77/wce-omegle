@@ -160,6 +160,9 @@ socket.on('partner', function (partner_data) {
             }
         });
     }
+    else{
+        console.log('Partner already set. Ignoring new partner data.');
+    }
 });
 
 socket.on('user-disconnected', userId => {

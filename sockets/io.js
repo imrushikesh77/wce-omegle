@@ -1,8 +1,8 @@
-const ioHandler = (io) => {
-    let num_users = 0;
-    let waiting_list = [];
-    let pairs = new Map(); // To keep track of pairings and connections
+let num_users = 0;
+let waiting_list = [];
+let pairs = new Map(); // To track pairs
 
+const ioHandler = (io) => {
     io.on('connection', (socket) => {
         num_users++;
         socket.partner = null;
@@ -19,8 +19,8 @@ const ioHandler = (io) => {
                 if (socket1 && socket1.connected && socket2 && socket2.connected) {
                     socket1.partner = socket2.id;
                     socket2.partner = socket1.id;
-                    pairs.set(socket1.id, socket2.id); // Register pair
-                    pairs.set(socket2.id, socket1.id); // Register pair
+                    pairs.set(socket1.id, socket2.id);
+                    pairs.set(socket2.id, socket1.id);
                     socket1.emit("partner", { id: socket2.id });
                     socket2.emit("partner", { id: socket1.id });
                 } else {
@@ -50,12 +50,11 @@ const ioHandler = (io) => {
         });
 
         socket.on('send-signal', (data) => {
-            if (pairs.has(data.to)) { // Check if the target is a paired user
-                io.to(data.to).emit('signal-receive', {
-                    signal: data.signal,
-                    from: data.from
-                });
-            }
+            console.log(`Signal received from ${data.from} to ${data.to}`);
+            io.to(data.to).emit('signal-receive', {
+                signal: data.signal,
+                from: data.from
+            });
         });
 
         socket.on('disconnect', () => {
@@ -63,14 +62,14 @@ const ioHandler = (io) => {
             if (socket.partner !== null) {
                 const partnerSocket = io.sockets.sockets.get(socket.partner);
                 if (partnerSocket) {
-                    partnerSocket.emit("typing", false);
-                    partnerSocket.emit("disconnecting now", 'Your partner has disconnected. Refresh the page to chat again.');
+                    partnerSocket.emit("disconnecting now", 'Your Partner has disconnected. Refresh the page to chat again');
                     partnerSocket.partner = null;
                     pairs.delete(partnerSocket.id);
                     if (partnerSocket.connected) {
                         waiting_list.push(partnerSocket.id);
                     }
                 }
+                pairs.delete(socket.id);
             } else {
                 const index = waiting_list.indexOf(socket.id);
                 if (index !== -1) {
@@ -87,7 +86,6 @@ const ioHandler = (io) => {
                 socket.to(socket.partner).emit("typing", data);
             }
         });
-
     });
 
     io.on('error', (err) => {
@@ -96,5 +94,6 @@ const ioHandler = (io) => {
 };
 
 module.exports = {
-    ioHandler
+    ioHandler,
+    num_users
 };

@@ -120,41 +120,13 @@ socket.on('chat message partner', function (msg) {
 });
 
 // Consolidate disconnection handling into one event
-socket.on('disconnecting now', function (msg) {
-    messagesDiv.innerHTML += '<div class="partner">' + msg + "</div>";
-    // Cleanup UI
-    document.getElementById("m").style.pointerEvents = "none";
-    document.getElementById("m").style.background = FORM_INPUT_DISABLED_COLOR;
-    document.getElementById("submitButton").style.pointerEvents = "none";
-    document.getElementById("submitButton").style.background = FORM_INPUT_DISABLED_COLOR;
-    document.getElementById("m").placeholder = "";
-    messagesDiv.scrollTop = messagesDiv.scrollHeight;
-
-    // Optionally cleanup peer connection
-    if (peerConnection) {
-        peerConnection.close();
-        peerConnection = null;
-    }
-});
-
-socket.on('disconnect', function () {
-    if (peerConnection) {
-        peerConnection.close();
-        peerConnection = null;
-    }
-    remoteVideo.srcObject = null;
-    partner_id = null;
-});
-
-
-
 socket.on('partner', function (partner_data) {
     if (partner_id == null) {
+        partner_id = partner_data.id;
         document.getElementById("m").style.pointerEvents = "auto";
         document.getElementById("m").style.background = FORM_INPUT_MSG_COLOR;
         document.getElementById("submitButton").style.pointerEvents = "auto";
         document.getElementById("submitButton").style.background = FORM_INPUT_SEND_COLOR;
-        partner_id = partner_data.id;
         document.getElementById("m").placeholder = "Type to send a message";
 
         let partnerMessage = '<div class="partner">You are paired ' + '</div>';
@@ -166,11 +138,36 @@ socket.on('partner', function (partner_data) {
                 id: socket.id,
             }
         });
-    }
-    else{
+    } else {
         console.log('Partner already set. Ignoring new partner data.');
     }
 });
+
+// Cleanup on disconnect
+socket.on('disconnecting now', function (msg) {
+    messagesDiv.innerHTML += '<div class="partner">' + msg + "</div>";
+    remoteVideo.srcObject = null;
+    partner_id = null;
+
+    document.getElementById("m").style.pointerEvents = "none";
+    document.getElementById("m").style.background = FORM_INPUT_DISABLED_COLOR;
+    document.getElementById("submitButton").style.pointerEvents = "none";
+    document.getElementById("submitButton").style.background = FORM_INPUT_DISABLED_COLOR;
+    document.getElementById("m").placeholder = "";
+
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    window.location.reload();
+});
+
+socket.on('disconnect', function () {
+    if (peerConnection) {
+        peerConnection.close();
+        peerConnection = null;
+    }
+    remoteVideo.srcObject = null;
+    partner_id = null;
+});
+
 
 
 function callUser(userId) {

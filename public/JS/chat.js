@@ -5,7 +5,7 @@ const MSG_MINE_COLOR = 'linear-gradient(to bottom, #ff99ff 0%, #ff0066 100%)';
 
 const MSG_PARTNER_COLOR = 'linear-gradient(to bottom left, #33ccff 0%, #3333cc 100%)';
 
-let socket = io('http://10.40.10.120:3000')
+let socket = io('/')
 
 let timeout;
 let partner_id, partner_username, partner_avatar, my_id;

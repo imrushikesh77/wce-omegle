@@ -120,24 +120,32 @@ socket.on('chat message partner', function (msg) {
 });
 
 // Consolidate disconnection handling into one event
-
 socket.on('disconnecting now', function (msg) {
     messagesDiv.innerHTML += '<div class="partner">' + msg + "</div>";
-    // remoteVideo.srcObject = null;
+    // Cleanup UI
     document.getElementById("m").style.pointerEvents = "none";
     document.getElementById("m").style.background = FORM_INPUT_DISABLED_COLOR;
     document.getElementById("submitButton").style.pointerEvents = "none";
     document.getElementById("submitButton").style.background = FORM_INPUT_DISABLED_COLOR;
     document.getElementById("m").placeholder = "";
     messagesDiv.scrollTop = messagesDiv.scrollHeight;
-    // Optionally reload the page or handle other actions
-    window.location.reload(); // Uncomment if you want to reload the page
+
+    // Optionally cleanup peer connection
+    if (peerConnection) {
+        peerConnection.close();
+        peerConnection = null;
+    }
 });
 
 socket.on('disconnect', function () {
+    if (peerConnection) {
+        peerConnection.close();
+        peerConnection = null;
+    }
     remoteVideo.srcObject = null;
     partner_id = null;
 });
+
 
 
 socket.on('partner', function (partner_data) {
@@ -164,74 +172,99 @@ socket.on('partner', function (partner_data) {
     }
 });
 
+
 function callUser(userId) {
-    peerConnection = new RTCPeerConnection(configuration);
+    if (!peerConnection) {
+        peerConnection = new RTCPeerConnection(configuration);
 
-    peerConnection.onicecandidate = event => {
-        if (event.candidate) {
-            socket.emit('send-signal', {
-                signal: {
-                    candidate: event.candidate.toJSON()
-                },
-                to: userId,
-                from: socket.id
-            });
-        }
-    };
+        peerConnection.onicecandidate = event => {
+            if (event.candidate) {
+                socket.emit('send-signal', {
+                    signal: {
+                        candidate: event.candidate.toJSON()
+                    },
+                    to: userId,
+                    from: socket.id
+                });
+            }
+        };
 
-    peerConnection.ontrack = event => {
-        console.log('Received remote stream');
-        remoteVideo.srcObject = event.streams[0];
-    };
+        peerConnection.ontrack = event => {
+            console.log('Received remote stream');
+            remoteVideo.srcObject = event.streams[0];
+        };
 
-    localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+        localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
 
-    peerConnection.createOffer()
-        .then(offer => {
-            return peerConnection.setLocalDescription(offer);
-        })
-        .then(() => {
-            socket.emit('send-signal', {
-                signal: peerConnection.localDescription,
-                to: userId,
-                from: socket.id
-            });
-        })
-        .catch(error => console.error('Error creating offer.', error));
+        peerConnection.createOffer()
+            .then(offer => {
+                return peerConnection.setLocalDescription(offer);
+            })
+            .then(() => {
+                socket.emit('send-signal', {
+                    signal: peerConnection.localDescription,
+                    to: userId,
+                    from: socket.id
+                });
+            })
+            .catch(error => console.error('Error creating offer.', error));
+    }
 }
 
 async function answerCall(data) {
-    peerConnection = new RTCPeerConnection(configuration);
+    if (!peerConnection) {
+        peerConnection = new RTCPeerConnection(configuration);
 
-    peerConnection.onicecandidate = event => {
-        if (event.candidate) {
+        peerConnection.onicecandidate = event => {
+            if (event.candidate) {
+                socket.emit('send-signal', {
+                    signal: {
+                        candidate: event.candidate.toJSON()
+                    },
+                    to: data.from,
+                    from: socket.id
+                });
+            }
+        };
+
+        peerConnection.ontrack = event => {
+            console.log('Received remote stream');
+            remoteVideo.srcObject = event.streams[0];
+        };
+
+        localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+
+        try {
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(data.signal));
+            const answer = await peerConnection.createAnswer();
+            await peerConnection.setLocalDescription(answer);
+
             socket.emit('send-signal', {
-                signal: {
-                    candidate: event.candidate.toJSON()
-                },
+                signal: peerConnection.localDescription,
                 to: data.from,
                 from: socket.id
             });
+        } catch (error) {
+            console.error('Error during answering call.', error);
         }
-    };
-
-    peerConnection.ontrack = event => {
-        console.log('Received remote stream');
-        remoteVideo.srcObject = event.streams[0];
-    };
-
-    localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
-
-    await peerConnection.setRemoteDescription(new RTCSessionDescription(data.signal));
-    const answer = await peerConnection.createAnswer();
-    await peerConnection.setLocalDescription(answer);
-
-    socket.emit('send-signal', {
-        signal: peerConnection.localDescription,
-        to: data.from,
-        from: socket.id
-    });
+    }
 }
+
+socket.on('signal-receive', async (data) => {
+    if (peerConnection) {
+        if (data.signal.type === 'offer') {
+            await answerCall(data);
+        } else if (data.signal.type === 'answer') {
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(data.signal));
+        } else if (data.signal.candidate) {
+            try {
+                await peerConnection.addIceCandidate(new RTCIceCandidate(data.signal.candidate));
+            } catch (err) {
+                console.error('Error adding received ICE candidate', err);
+            }
+        }
+    }
+});
 
 document.addEventListener('DOMContentLoaded', function () {
     const msgInput = document.getElementById("m");

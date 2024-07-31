@@ -1,37 +1,28 @@
-let num_users = 0;
-let waiting_list = [];
-let pairs = new Set();
-
 const ioHandler = (io) => {
+    let num_users = 0;
+    let waiting_list = [];
+    let pairs = new Map(); // To keep track of pairings and connections
+
     io.on('connection', (socket) => {
         num_users++;
         socket.partner = null;
         socket.emit("init", { my_id: socket.id });
 
-        // Try to pair users from the waiting list
+        // Check if there are users in the waiting list and pair them up
         const tryPairing = () => {
-            // Pair users only if there are users in the waiting list
             while (waiting_list.length >= 2) {
                 const user1 = waiting_list.shift();
                 const user2 = waiting_list.shift();
-                
                 const socket1 = io.sockets.sockets.get(user1);
                 const socket2 = io.sockets.sockets.get(user2);
 
-                // Ensure both users are connected
                 if (socket1 && socket1.connected && socket2 && socket2.connected) {
-                    // Make sure these users are not already paired
-                    if (pairs.has(user1) || pairs.has(user2)) {
-                        waiting_list.push(user1);  // Push back the users to retry pairing later
-                        waiting_list.push(user2);
-                    } else {
-                        socket1.partner = socket2.id;
-                        socket2.partner = socket1.id;
-                        pairs.add(socket1.id);
-                        pairs.add(socket2.id);
-                        socket1.emit("partner", { id: socket2.id });
-                        socket2.emit("partner", { id: socket1.id });
-                    }
+                    socket1.partner = socket2.id;
+                    socket2.partner = socket1.id;
+                    pairs.set(socket1.id, socket2.id); // Register pair
+                    pairs.set(socket2.id, socket1.id); // Register pair
+                    socket1.emit("partner", { id: socket2.id });
+                    socket2.emit("partner", { id: socket1.id });
                 } else {
                     if (socket1 && socket1.connected) waiting_list.push(user1);
                     if (socket2 && socket2.connected) waiting_list.push(user2);
@@ -59,11 +50,12 @@ const ioHandler = (io) => {
         });
 
         socket.on('send-signal', (data) => {
-            console.log(`Signal received from ${data.from} to ${data.to}`);
-            io.to(data.to).emit('signal-receive', {
-                signal: data.signal,
-                from: data.from
-            });
+            if (pairs.has(data.to)) { // Check if the target is a paired user
+                io.to(data.to).emit('signal-receive', {
+                    signal: data.signal,
+                    from: data.from
+                });
+            }
         });
 
         socket.on('disconnect', () => {
@@ -72,7 +64,7 @@ const ioHandler = (io) => {
                 const partnerSocket = io.sockets.sockets.get(socket.partner);
                 if (partnerSocket) {
                     partnerSocket.emit("typing", false);
-                    partnerSocket.emit("disconnecting now", 'Your Partner has disconnected. Refresh the page to chat again');
+                    partnerSocket.emit("disconnecting now", 'Your partner has disconnected. Refresh the page to chat again.');
                     partnerSocket.partner = null;
                     pairs.delete(partnerSocket.id);
                     if (partnerSocket.connected) {
@@ -95,6 +87,7 @@ const ioHandler = (io) => {
                 socket.to(socket.partner).emit("typing", data);
             }
         });
+
     });
 
     io.on('error', (err) => {
@@ -103,6 +96,5 @@ const ioHandler = (io) => {
 };
 
 module.exports = {
-    ioHandler,
-    num_users
+    ioHandler
 };

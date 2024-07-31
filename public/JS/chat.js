@@ -5,7 +5,7 @@ const MSG_MINE_COLOR = 'linear-gradient(to bottom, #ff99ff 0%, #ff0066 100%)';
 
 const MSG_PARTNER_COLOR = 'linear-gradient(to bottom left, #33ccff 0%, #3333cc 100%)';
 
-let socket = io('/')
+let socket = io('https://wce-omegle.up.railway.app/')
 
 let timeout;
 let partner_id, partner_username, partner_avatar, my_id;

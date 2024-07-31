@@ -10,33 +10,35 @@ const ioHandler = (io) => {
         socket.username = 'anonymous-' + faker.name.firstName();
         socket.emit("init", { username: socket.username, my_id: socket.id });
 
-        if (waiting_list.length > 0) {
-            // If there are users in the waiting list, pair them up
-            const partnerSocket = waiting_list.pop();
-            socket.partner = partnerSocket.id;
-            partnerSocket.partner = socket.id;
-            socket.broadcast.to(socket.partner).emit("partner", { id: socket.id, username: socket.username, avatar: socket.avatar });
-            socket.emit("partner", { id: partnerSocket.id, username: partnerSocket.username, avatar: partnerSocket.avatar });
-        } else {
-            waiting_list.push(socket);
-        }
+        // Check if there are users in the waiting list and pair them up
+        const tryPairing = () => {
+            while (waiting_list.length > 0) {
+                const partnerSocket = waiting_list.shift();  // Get the first user in the waiting list
+                if (partnerSocket.connected && partnerSocket.partner === null) {  // Ensure the partner is still connected and available
+                    socket.partner = partnerSocket.id;
+                    partnerSocket.partner = socket.id;
+                    socket.emit("partner", { id: partnerSocket.id, username: partnerSocket.username });
+                    partnerSocket.emit("partner", { id: socket.id, username: socket.username });
+                    return;
+                }
+            }
+            waiting_list.push(socket);  // Add the socket to the waiting list if no partner is found
+        };
+
+        tryPairing();
 
         console.log(`User connected: ${socket.id}. Active Users: ${num_users}, Waiting List Size: ${waiting_list.length}`);
 
         socket.on('chat message', (data) => {
             const { msg, target } = data;
             const source = socket.id;
-            socket.broadcast.to(target).emit("chat message partner", msg);
+            socket.to(target).emit("chat message partner", msg);
             io.to(source).emit("chat message mine", msg);
         });
 
         socket.on('join-room', (roomId) => {
             socket.join(roomId);
             socket.to(roomId).emit('user-connected', socket.id);
-    
-            socket.on('disconnect', () => {
-                socket.to(roomId).emit('user-disconnected', socket.id);
-            });
         });
 
         socket.on('send-signal', (data) => {
@@ -50,9 +52,15 @@ const ioHandler = (io) => {
         socket.on('disconnect', () => {
             console.log(`User disconnected: ${socket.id}`);
             if (socket.partner !== null) {
-                socket.broadcast.to(socket.partner).emit("typing", false);
-                socket.broadcast.to(socket.partner).emit("disconnecting now", 'Your Partner has disconnected. Refresh the page to chat again');
-                io.to(socket.partner).partner = null;
+                const partnerSocket = io.sockets.sockets.get(socket.partner);
+                if (partnerSocket) {
+                    partnerSocket.emit("typing", false);
+                    partnerSocket.emit("disconnecting now", 'Your Partner has disconnected. Refresh the page to chat again');
+                    partnerSocket.partner = null;
+                    if (partnerSocket.connected) {
+                        waiting_list.push(partnerSocket);
+                    }
+                }
             } else {
                 const index = waiting_list.indexOf(socket);
                 if (index !== -1) {
@@ -64,7 +72,9 @@ const ioHandler = (io) => {
         });
 
         socket.on('typing', (data) => {
-            socket.broadcast.to(socket.partner).emit("typing", data);
+            if (socket.partner) {
+                socket.to(socket.partner).emit("typing", data);
+            }
         });
     });
 

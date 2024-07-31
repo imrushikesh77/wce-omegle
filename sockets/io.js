@@ -13,7 +13,7 @@
             // Check if there are users in the waiting list and pair them up
             const tryPairing = () => {
                 if (socket.partner === null) {  // Only try to pair if this socket isn't already paired
-                    while (waiting_list.length > 0) {
+                    if (waiting_list.length > 0) {
                         const partnerSocket = waiting_list.shift();
                         if (partnerSocket.connected && partnerSocket.partner === null) {
                             socket.partner = partnerSocket.id;

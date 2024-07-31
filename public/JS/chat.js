@@ -168,6 +168,9 @@ socket.on('partner', function (partner_data) {
 socket.on('user-disconnected', userId => {
     console.log('User disconnected: ', userId);
     remoteVideo.srcObject = null;
+    partner_id = null;
+    partner_username = null;
+    partner_avatar = null;
 });
 
 function callUser(userId) {

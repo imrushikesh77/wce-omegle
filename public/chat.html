@@ -14,17 +14,18 @@
 
 	<link rel="stylesheet" href="/CSS/emojionearea.min.css">
 	<style>
-		/* Your existing styles */
-
 		.center-text {
 			display: flex;
 			align-items: center;
 			justify-content: center;
 			height: 100%;
-			/* Adjust as needed */
 		}
 
-		/* Your existing styles */
+		video {
+			width: 100%;
+			border: 1px solid rgb(230, 12, 12);
+		}
+
 	</style>
 </head>
 
@@ -54,7 +55,8 @@
 						<h3 id="partnername" style="font-size: 20px;"></h3>
 						<br>
 					</div>
-					<img id="partnerimg" src="https://xsgames.co/randomusers/avatar.php?g=pixel">
+					<!-- <img id="partnerimg" src="https://xsgames.co/randomusers/avatar.php?g=pixel"> -->
+					<video id="remoteVideo" autoplay></video>
 				</span>
 			</div>
 			<!-- user intro -->
@@ -66,7 +68,8 @@
 						<h3 id="myname" style="font-size: 20px;"></h3>
 						<br>
 					</div>
-					<img id="myimg" src="https://api.multiavatar.com/Binx Bond.png" class="mid">
+					<!-- <img id="myimg" src="https://api.multiavatar.com/Binx Bond.png" class="mid"> -->
+					<video id="localVideo" autoplay muted></video>
 				</span>
 			</div>
 
@@ -104,6 +107,7 @@
 
 
 	<script src="/socket.io/socket.io.js"></script>
+	<script src="https://webrtc.github.io/adapter/adapter-latest.js"></script>
 	<script src="/JS/chat.js"></script>
 </body>
 

@@ -27,17 +27,6 @@ router.get('/', getHomePage);
 
 router.get('/about', getAboutPage);
 
-router.get('/login', getLoginLimiter,authMiddleware3, getLoginPage);
-
-router.post('/login', postLoginLimiter,authMiddleware3, postLoginPage);
-
-router.get('/verify',getVerifyLimiter,authMiddleware1, getVerifyPage);
-
-router.post('/verify',postVerifyLimiter, authMiddleware1, postVerifyPage);
-
-router.get('/chat', authMiddleware2, getChatPage);
-
-router.get('/logout', getLogout);
-
+router.get('/chat', getChatPage);
 
 module.exports = router;

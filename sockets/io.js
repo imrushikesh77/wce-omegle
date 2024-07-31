@@ -8,8 +8,7 @@ const ioHandler = (io) => {
         num_users++;
         socket.partner = null;
         socket.username = 'anonymous-' + faker.name.firstName();
-        socket.avatar = faker.internet.avatar();
-        socket.emit("init", { username: socket.username, avatar: socket.avatar, my_id: socket.id });
+        socket.emit("init", { username: socket.username, my_id: socket.id });
 
         if (waiting_list.length > 0) {
             // If there are users in the waiting list, pair them up
@@ -17,17 +16,12 @@ const ioHandler = (io) => {
             socket.partner = partnerSocket.id;
             partnerSocket.partner = socket.id;
             socket.broadcast.to(socket.partner).emit("partner", { id: socket.id, username: socket.username, avatar: socket.avatar });
-            // io.to(socket.partner).emit("partner", { id: socket.id, username: socket.username, avatar: socket.avatar });
-            // io.to(partnerSocket.id).emit("partner", { id: partnerSocket.id, username: partnerSocket.username, avatar: partnerSocket.avatar });
             socket.emit("partner", { id: partnerSocket.id, username: partnerSocket.username, avatar: partnerSocket.avatar });
-            // console.log("Partnered " + socket.username + " with " + partnerSocket.username);
-            // console.log("and" + partnerSocket.username + " with " + socket.username);
         } else {
-            // If no one is in the waiting list, add the current socket to the list
             waiting_list.push(socket);
         }
 
-        console.log("Active Users = " + num_users + ", Waiting list size = " + waiting_list.length);
+        // console.log("Active Users = " + num_users + ", Waiting list size = " + waiting_list.length);
 
         socket.on('chat message', function (data) {
             var msg = data.msg;
@@ -35,6 +29,22 @@ const ioHandler = (io) => {
             var source = socket.id;
             socket.broadcast.to(target).emit("chat message partner", msg);
             io.to(source).emit("chat message mine", msg);
+        });
+
+        socket.on('join-room', roomId => {
+            socket.join(roomId);
+            socket.to(roomId).emit('user-connected', socket.id);
+    
+            socket.on('disconnect', () => {
+                socket.to(roomId).emit('user-disconnected', socket.id);
+            });
+        });
+
+        socket.on('send-signal', data => {
+            io.to(data.to).emit('signal-receive', {
+                signal: data.signal,
+                from: data.from
+            });
         });
 
         socket.on('disconnect', function () {
@@ -49,7 +59,7 @@ const ioHandler = (io) => {
                 }
             }
             num_users--;
-            console.log("Active Users = " + num_users + ", Waiting List = " + waiting_list.length);
+            // console.log("Active Users = " + num_users + ", Waiting List = " + waiting_list.length);
         });
 
         socket.on('typing', function (data) {

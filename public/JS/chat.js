@@ -5,7 +5,7 @@ const MSG_MINE_COLOR = 'linear-gradient(to bottom, #ff99ff 0%, #ff0066 100%)';
 
 const MSG_PARTNER_COLOR = 'linear-gradient(to bottom left, #33ccff 0%, #3333cc 100%)';
 
-let socket = io('/');
+let socket = io('http://10.40.10.120:3000')
 
 let timeout;
 let partner_id, partner_username, partner_avatar, my_id;
@@ -13,15 +13,60 @@ let audio = new Audio('../assets/sounds/notif.mp3');
 
 document.getElementById("messages").scrollTop = document.getElementById("messages").scrollHeight;
 document.getElementById("partnername").innerHTML = " ";
-document.getElementById("partnerimg").src = " ";
 document.getElementById("m").style.pointerEvents = "none";
 document.getElementById("m").style.background = FORM_INPUT_DISABLED_COLOR;
 document.getElementById("submitButton").style.pointerEvents = "none";
 document.getElementById("submitButton").style.background = FORM_INPUT_DISABLED_COLOR;
 
+const localVideo = document.getElementById('localVideo');
+const remoteVideo = document.getElementById('remoteVideo');
+
+let localStream;
+let peerConnection;
+
+const constraints = {
+    video: true,
+    audio: true
+};
+
+const configuration = {
+    iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+    ]
+};
+
 const messagesDiv = document.getElementById("messages");
 
 let partnerMessage = '<div class="partner">You are talking with:' + partner_username + '</div>';
+
+navigator.mediaDevices.getUserMedia(constraints)
+    .then(stream => {
+        localVideo.srcObject = stream;
+        localStream = stream;
+
+        socket.emit('join-room', 'room1');
+
+        socket.on('user-connected', userId => {
+            console.log('User connected: ', userId);
+            callUser(userId);
+        });
+
+        socket.on('signal-receive', async (data) => {
+            if (data.signal.type === 'offer') {
+                await answerCall(data);
+            } else if (data.signal.type === 'answer') {
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(data.signal));
+            } else if (data.signal.candidate) {
+                try {
+                    await peerConnection.addIceCandidate(new RTCIceCandidate(data.signal.candidate));
+                } catch (err) {
+                    console.error('Error adding received ICE candidate', err);
+                }
+            }
+        });
+    })
+    .catch(error => console.error('Error accessing media devices.', error));
+
 
 function timeoutFunction() {
     socket.emit('typing', false);
@@ -60,7 +105,6 @@ socket.on('init', function (data) {
     socket.avatar = data.avatar;
     my_id = data.my_id;
     document.getElementById("myname").innerHTML = socket.username;
-    document.getElementById("myimg").src = "https://api.multiavatar.com/Binx Bond.png";
 });
 
 socket.on('chat message mine', function (msg) {
@@ -109,7 +153,6 @@ socket.on('disconnecting now', function (msg) {
 socket.on('partner', function (partner_data) {
     if (partner_id == null) {
         document.getElementById("partnername").innerHTML = partner_data.username;
-        document.getElementById("partnerimg").src = "https://xsgames.co/randomusers/avatar.php?g=pixel";
         document.getElementById("m").style.pointerEvents = "auto";
         document.getElementById("m").style.background = FORM_INPUT_MSG_COLOR;
         document.getElementById("submitButton").style.pointerEvents = "auto";
@@ -134,6 +177,79 @@ socket.on('partner', function (partner_data) {
     }
 });
 
+socket.on('user-disconnected', userId => {
+    console.log('User disconnected: ', userId);
+    remoteVideo.srcObject = null;
+});
+
+function callUser(userId) {
+    peerConnection = new RTCPeerConnection(configuration);
+
+    peerConnection.onicecandidate = event => {
+        if (event.candidate) {
+            socket.emit('send-signal', {
+                signal: {
+                    candidate: event.candidate.toJSON()
+                },
+                to: userId,
+                from: socket.id
+            });
+        }
+    };
+
+    peerConnection.ontrack = event => {
+        remoteVideo.srcObject = event.streams[0];
+    };
+
+    localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+
+    peerConnection.createOffer()
+        .then(offer => {
+            return peerConnection.setLocalDescription(offer);
+        })
+        .then(() => {
+            socket.emit('send-signal', {
+                signal: peerConnection.localDescription,
+                to: userId,
+                from: socket.id
+            });
+        })
+        .catch(error => console.error('Error creating offer.', error));
+}
+
+async function answerCall(data) {
+    peerConnection = new RTCPeerConnection(configuration);
+
+    peerConnection.onicecandidate = event => {
+        if (event.candidate) {
+            socket.emit('send-signal', {
+                signal: {
+                    candidate: event.candidate.toJSON()
+                },
+                to: data.from,
+                from: socket.id
+            });
+        }
+    };
+
+    peerConnection.ontrack = event => {
+        remoteVideo.srcObject = event.streams[0];
+    };
+
+    localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+
+    await peerConnection.setRemoteDescription(new RTCSessionDescription(data.signal));
+    const answer = await peerConnection.createAnswer();
+    await peerConnection.setLocalDescription(answer);
+
+    socket.emit('send-signal', {
+        signal: peerConnection.localDescription,
+        to: data.from,
+        from: socket.id
+    });
+}
+
+
 document.addEventListener('DOMContentLoaded', function () {
     const msgInput = document.getElementById("m");
     msgInput.emojioneArea({
@@ -149,3 +265,5 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 });
+
+

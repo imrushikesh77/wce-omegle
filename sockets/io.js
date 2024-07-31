@@ -4,7 +4,7 @@ let num_users = 0;
 let waiting_list = [];
 
 const ioHandler = (io) => {
-    io.on('connection', function (socket) {
+    io.on('connection', (socket) => {
         num_users++;
         socket.partner = null;
         socket.username = 'anonymous-' + faker.name.firstName();
@@ -21,17 +21,16 @@ const ioHandler = (io) => {
             waiting_list.push(socket);
         }
 
-        // console.log("Active Users = " + num_users + ", Waiting list size = " + waiting_list.length);
+        console.log(`User connected: ${socket.id}. Active Users: ${num_users}, Waiting List Size: ${waiting_list.length}`);
 
-        socket.on('chat message', function (data) {
-            var msg = data.msg;
-            var target = data.target;
-            var source = socket.id;
+        socket.on('chat message', (data) => {
+            const { msg, target } = data;
+            const source = socket.id;
             socket.broadcast.to(target).emit("chat message partner", msg);
             io.to(source).emit("chat message mine", msg);
         });
 
-        socket.on('join-room', roomId => {
+        socket.on('join-room', (roomId) => {
             socket.join(roomId);
             socket.to(roomId).emit('user-connected', socket.id);
     
@@ -40,14 +39,16 @@ const ioHandler = (io) => {
             });
         });
 
-        socket.on('send-signal', data => {
+        socket.on('send-signal', (data) => {
+            console.log(`Signal received from ${data.from} to ${data.to}`);
             io.to(data.to).emit('signal-receive', {
                 signal: data.signal,
                 from: data.from
             });
         });
 
-        socket.on('disconnect', function () {
+        socket.on('disconnect', () => {
+            console.log(`User disconnected: ${socket.id}`);
             if (socket.partner !== null) {
                 socket.broadcast.to(socket.partner).emit("typing", false);
                 socket.broadcast.to(socket.partner).emit("disconnecting now", 'Your Partner has disconnected. Refresh the page to chat again');
@@ -59,16 +60,16 @@ const ioHandler = (io) => {
                 }
             }
             num_users--;
-            // console.log("Active Users = " + num_users + ", Waiting List = " + waiting_list.length);
+            console.log(`Active Users: ${num_users}, Waiting List Size: ${waiting_list.length}`);
         });
 
-        socket.on('typing', function (data) {
+        socket.on('typing', (data) => {
             socket.broadcast.to(socket.partner).emit("typing", data);
         });
     });
 
-    io.on('error', function (err) {
-        console.log(err.message);
+    io.on('error', (err) => {
+        console.log(`Socket.IO error: ${err.message}`);
     });
 };
 

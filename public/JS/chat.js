@@ -2,10 +2,9 @@ const FORM_INPUT_DISABLED_COLOR = '#000000';
 const FORM_INPUT_MSG_COLOR = '#ffffff';
 const FORM_INPUT_SEND_COLOR = '#f6166c';
 const MSG_MINE_COLOR = 'linear-gradient(to bottom, #ff99ff 0%, #ff0066 100%)';
-
 const MSG_PARTNER_COLOR = 'linear-gradient(to bottom left, #33ccff 0%, #3333cc 100%)';
 
-let socket = io('https://wce-omegle.up.railway.app/')
+let socket = io('/');
 
 let timeout;
 let partner_id, partner_username, partner_avatar, my_id;
@@ -67,17 +66,6 @@ navigator.mediaDevices.getUserMedia(constraints)
     })
     .catch(error => console.error('Error accessing media devices.', error));
 
-
-function timeoutFunction() {
-    socket.emit('typing', false);
-}
-
-function isTyping() {
-    socket.emit('typing', true);
-    clearTimeout(timeout);
-    timeout = setTimeout(timeoutFunction, 1000);
-}
-
 socket.on('typing', function (data) {
     const istypingLabel = document.getElementById("istyping");
     if (data) {
@@ -134,8 +122,6 @@ socket.on('chat message partner', function (msg) {
     messagesDiv.scrollTop = messagesDiv.scrollHeight;
 });
 
-
-
 socket.on('disconnecting now', function (msg) {
     messagesDiv.innerHTML += '<div class="partner">' + msg + "</div>";
     alert("Oops! your partner has disconnected , refreshing please wait.");
@@ -162,7 +148,6 @@ socket.on('partner', function (partner_data) {
         partner_avatar = partner_data.avatar;
         document.getElementById("m").placeholder = "Type to send a message";
 
-        // Include the partner's name in the message
         let partnerMessage = '<div class="partner">You are talking with ' + partner_username + '</div>';
         messagesDiv.innerHTML += partnerMessage;
 
@@ -198,6 +183,7 @@ function callUser(userId) {
     };
 
     peerConnection.ontrack = event => {
+        console.log('Received remote stream');
         remoteVideo.srcObject = event.streams[0];
     };
 
@@ -233,6 +219,7 @@ async function answerCall(data) {
     };
 
     peerConnection.ontrack = event => {
+        console.log('Received remote stream');
         remoteVideo.srcObject = event.streams[0];
     };
 
@@ -249,7 +236,6 @@ async function answerCall(data) {
     });
 }
 
-
 document.addEventListener('DOMContentLoaded', function () {
     const msgInput = document.getElementById("m");
     msgInput.emojioneArea({
@@ -265,5 +251,3 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 });
-
-

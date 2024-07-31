@@ -7,8 +7,7 @@ const MSG_PARTNER_COLOR = 'linear-gradient(to bottom left, #33ccff 0%, #3333cc 1
 let socket = io('/');
 
 let timeout;
-let partner_id = null;
-let my_id;
+let partner_id, my_id;
 let audio = new Audio('../assets/sounds/notif.mp3');
 
 document.getElementById("messages").scrollTop = document.getElementById("messages").scrollHeight;
@@ -36,6 +35,8 @@ const configuration = {
 
 const messagesDiv = document.getElementById("messages");
 
+let partnerMessage = '<div class="partner">You are with partner' + '</div>';
+
 navigator.mediaDevices.getUserMedia(constraints)
     .then(stream => {
         localVideo.srcObject = stream;
@@ -44,10 +45,8 @@ navigator.mediaDevices.getUserMedia(constraints)
         socket.emit('join-room', 'room1');
 
         socket.on('user-connected', userId => {
-            if (!partner_id) {
-                console.log('User connected: ', userId);
-                callUser(userId);
-            }
+            console.log('User connected: ', userId);
+            callUser(userId);
         });
 
         socket.on('signal-receive', async (data) => {
@@ -66,41 +65,57 @@ navigator.mediaDevices.getUserMedia(constraints)
     })
     .catch(error => console.error('Error accessing media devices.', error));
 
-function isTyping() {
-    socket.emit('typing', true);
-    clearTimeout(timeout);
-    timeout = setTimeout(() => socket.emit('typing', false), 1000);
-}
+socket.on('typing', function (data) {
+    const istypingLabel = document.getElementById("istyping");
+    if (data) {
+        istypingLabel.style.visibility = "visible";
+    } else {
+        istypingLabel.style.visibility = "hidden";
+    }
+});
 
 function submitForm() {
+    console.log('Form submitted!');
     var msg = document.getElementById("m").value.trim();
-    if (msg !== '') {
+
+    if (msg != '') {
         socket.emit('chat message', { msg: msg, target: partner_id });
     }
+
     document.getElementById("m").value = '';
+
     return false;
 }
 
 socket.on('init', function (data) {
     my_id = data.my_id;
+    // document.getElementById("myname").innerHTML = socket.username;
 });
 
 socket.on('chat message mine', function (msg) {
+    // console.log('Message sent from me: ' + msg);
+    let output_msg = msg;
     let meDiv = document.createElement('div');
     meDiv.className = 'me';
+    meDiv.style.display = 'none';
     meDiv.style.background = MSG_MINE_COLOR;
-    meDiv.innerHTML = msg;
+    meDiv.innerHTML = output_msg;
     messagesDiv.appendChild(meDiv);
+    meDiv.style.display = 'block';
     messagesDiv.scrollTop = messagesDiv.scrollHeight;
 });
 
 socket.on('chat message partner', function (msg) {
+    console.log('Message received from partner: ' + msg);
     audio.play();
+    let output_msg = msg;
     let partnerDiv = document.createElement('div');
     partnerDiv.className = 'partner';
+    partnerDiv.style.display = 'none';
     partnerDiv.style.background = MSG_PARTNER_COLOR;
-    partnerDiv.innerHTML = msg;
+    partnerDiv.innerHTML = output_msg;
     messagesDiv.appendChild(partnerDiv);
+    partnerDiv.style.display = 'block';
     messagesDiv.scrollTop = messagesDiv.scrollHeight;
 });
 
@@ -109,6 +124,12 @@ socket.on('disconnecting now', function (msg) {
     alert("Oops! your partner has disconnected, refreshing please wait.");
     remoteVideo.srcObject = null;
     window.location.reload();
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    document.getElementById("m").style.pointerEvents = "none";
+    document.getElementById("m").style.background = FORM_INPUT_DISABLED_COLOR;
+    document.getElementById("submitButton").style.pointerEvents = "none";
+    document.getElementById("submitButton").style.background = FORM_INPUT_DISABLED_COLOR;
+    document.getElementById("m").placeholder = "";
 });
 
 socket.on('disconnect', function () {
@@ -117,36 +138,55 @@ socket.on('disconnect', function () {
 });
 
 socket.on('partner', function (partner_data) {
-    if (!partner_id) {
-        partner_id = partner_data.id;
+    if (partner_id == null) {
         document.getElementById("m").style.pointerEvents = "auto";
         document.getElementById("m").style.background = FORM_INPUT_MSG_COLOR;
         document.getElementById("submitButton").style.pointerEvents = "auto";
         document.getElementById("submitButton").style.background = FORM_INPUT_SEND_COLOR;
-        messagesDiv.innerHTML += '<div class="partner">You are paired</div>';
-        socket.emit('partner', { target: partner_id, data: { id: socket.id } });
-    } else {
+        partner_id = partner_data.id;
+        document.getElementById("m").placeholder = "Type to send a message";
+
+        let partnerMessage = '<div class="partner">You are paired ' + '</div>';
+        messagesDiv.innerHTML += partnerMessage;
+
+        socket.emit('partner', {
+            target: partner_id,
+            data: {
+                id: socket.id,
+            }
+        });
+    }
+    else{
         console.log('Partner already set. Ignoring new partner data.');
     }
 });
 
 function callUser(userId) {
     peerConnection = new RTCPeerConnection(configuration);
+
     peerConnection.onicecandidate = event => {
         if (event.candidate) {
             socket.emit('send-signal', {
-                signal: { candidate: event.candidate.toJSON() },
+                signal: {
+                    candidate: event.candidate.toJSON()
+                },
                 to: userId,
                 from: socket.id
             });
         }
     };
+
     peerConnection.ontrack = event => {
+        console.log('Received remote stream');
         remoteVideo.srcObject = event.streams[0];
     };
+
     localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+
     peerConnection.createOffer()
-        .then(offer => peerConnection.setLocalDescription(offer))
+        .then(offer => {
+            return peerConnection.setLocalDescription(offer);
+        })
         .then(() => {
             socket.emit('send-signal', {
                 signal: peerConnection.localDescription,
@@ -159,22 +199,30 @@ function callUser(userId) {
 
 async function answerCall(data) {
     peerConnection = new RTCPeerConnection(configuration);
+
     peerConnection.onicecandidate = event => {
         if (event.candidate) {
             socket.emit('send-signal', {
-                signal: { candidate: event.candidate.toJSON() },
+                signal: {
+                    candidate: event.candidate.toJSON()
+                },
                 to: data.from,
                 from: socket.id
             });
         }
     };
+
     peerConnection.ontrack = event => {
+        console.log('Received remote stream');
         remoteVideo.srcObject = event.streams[0];
     };
+
     localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+
     await peerConnection.setRemoteDescription(new RTCSessionDescription(data.signal));
     const answer = await peerConnection.createAnswer();
     await peerConnection.setLocalDescription(answer);
+
     socket.emit('send-signal', {
         signal: peerConnection.localDescription,
         to: data.from,
@@ -188,7 +236,7 @@ document.addEventListener('DOMContentLoaded', function () {
         saveEmojisAs: 'shortname',
         events: {
             keyup: function (editor, event) {
-                if (event.which === 13) {
+                if (event.which == 13) {
                     document.getElementById("msgform").submit();
                 } else {
                     isTyping();

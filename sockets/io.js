@@ -7,23 +7,8 @@ const ioHandler = (io) => {
         socket.partner = null;
         socket.emit("init", { my_id: socket.id });
 
-        const tryPairing = () => {
-            if (socket.partner === null) {
-                while (waiting_list.length > 0) {
-                    const partnerSocketId = waiting_list.shift();
-                    const partnerSocket = io.sockets.sockets.get(partnerSocketId);
-                    if (partnerSocket && partnerSocket.connected && partnerSocket.partner === null) {
-                        socket.partner = partnerSocket.id;
-                        partnerSocket.partner = socket.id;
-                        socket.emit("partner", { id: partnerSocket.id });
-                        partnerSocket.emit("partner", { id: socket.id });
-                        return;
-                    }
-                }
-                waiting_list.push(socket.id);
-            }
-        };
-
+        // Add the new user to the waiting list
+        waiting_list.push(socket.id);
         tryPairing();
 
         console.log(`User connected: ${socket.id}. Active Users: ${num_users}, Waiting List Size: ${waiting_list.length}`);
@@ -69,6 +54,7 @@ const ioHandler = (io) => {
             }
             num_users--;
             console.log(`Active Users: ${num_users}, Waiting List Size: ${waiting_list.length}`);
+            tryPairing();
         });
 
         socket.on('typing', (data) => {
@@ -76,6 +62,26 @@ const ioHandler = (io) => {
                 socket.to(socket.partner).emit("typing", data);
             }
         });
+
+        // Check if there are users in the waiting list and pair them up
+        const tryPairing = () => {
+            while (waiting_list.length >= 2) {
+                const user1 = waiting_list.shift();
+                const user2 = waiting_list.shift();
+                const socket1 = io.sockets.sockets.get(user1);
+                const socket2 = io.sockets.sockets.get(user2);
+
+                if (socket1 && socket1.connected && socket2 && socket2.connected) {
+                    socket1.partner = socket2.id;
+                    socket2.partner = socket1.id;
+                    socket1.emit("partner", { id: socket2.id });
+                    socket2.emit("partner", { id: socket1.id });
+                } else {
+                    if (socket1 && socket1.connected) waiting_list.push(user1);
+                    if (socket2 && socket2.connected) waiting_list.push(user2);
+                }
+            }
+        };
     });
 
     io.on('error', (err) => {

@@ -7,11 +7,10 @@ const MSG_PARTNER_COLOR = 'linear-gradient(to bottom left, #33ccff 0%, #3333cc 1
 let socket = io('/');
 
 let timeout;
-let partner_id, partner_username, partner_avatar, my_id;
+let partner_id, my_id;
 let audio = new Audio('../assets/sounds/notif.mp3');
 
 document.getElementById("messages").scrollTop = document.getElementById("messages").scrollHeight;
-document.getElementById("partnername").innerHTML = " ";
 document.getElementById("m").style.pointerEvents = "none";
 document.getElementById("m").style.background = FORM_INPUT_DISABLED_COLOR;
 document.getElementById("submitButton").style.pointerEvents = "none";
@@ -89,14 +88,12 @@ function submitForm() {
 }
 
 socket.on('init', function (data) {
-    socket.username = data.username;
-    socket.avatar = data.avatar;
     my_id = data.my_id;
-    document.getElementById("myname").innerHTML = socket.username;
+    // document.getElementById("myname").innerHTML = socket.username;
 });
 
 socket.on('chat message mine', function (msg) {
-    console.log('Message sent from me: ' + msg);
+    // console.log('Message sent from me: ' + msg);
     let output_msg = msg;
     let meDiv = document.createElement('div');
     meDiv.className = 'me';
@@ -125,10 +122,9 @@ socket.on('chat message partner', function (msg) {
 socket.on('disconnecting now', function (msg) {
     messagesDiv.innerHTML += '<div class="partner">' + msg + "</div>";
     alert("Oops! your partner has disconnected , refreshing please wait.");
+    remoteVideo.srcObject = null;
     window.location.reload();
     messagesDiv.scrollTop = messagesDiv.scrollHeight;
-    document.getElementById("partnername").innerHTML = " ";
-    document.getElementById("partnerimg").src = " ";
     document.getElementById("m").style.pointerEvents = "none";
     document.getElementById("m").style.background = FORM_INPUT_DISABLED_COLOR;
     document.getElementById("submitButton").style.pointerEvents = "none";
@@ -136,27 +132,27 @@ socket.on('disconnecting now', function (msg) {
     document.getElementById("m").placeholder = "";
 });
 
+socket.on('disconnect', function () {
+    remoteVideo.srcObject = null;
+    partner_id = null;
+});
+
 socket.on('partner', function (partner_data) {
     if (partner_id == null) {
-        document.getElementById("partnername").innerHTML = partner_data.username;
         document.getElementById("m").style.pointerEvents = "auto";
         document.getElementById("m").style.background = FORM_INPUT_MSG_COLOR;
         document.getElementById("submitButton").style.pointerEvents = "auto";
         document.getElementById("submitButton").style.background = FORM_INPUT_SEND_COLOR;
         partner_id = partner_data.id;
-        partner_username = partner_data.username;
-        partner_avatar = partner_data.avatar;
         document.getElementById("m").placeholder = "Type to send a message";
 
-        let partnerMessage = '<div class="partner">You are talking with ' + partner_username + '</div>';
+        let partnerMessage = '<div class="partner">You are paired ' + '</div>';
         messagesDiv.innerHTML += partnerMessage;
 
         socket.emit('partner', {
             target: partner_id,
             data: {
                 id: socket.id,
-                username: socket.username,
-                avatar: socket.avatar
             }
         });
     }
@@ -165,13 +161,6 @@ socket.on('partner', function (partner_data) {
     }
 });
 
-socket.on('user-disconnected', userId => {
-    console.log('User disconnected: ', userId);
-    remoteVideo.srcObject = null;
-    partner_id = null;
-    partner_username = null;
-    partner_avatar = null;
-});
 
 function callUser(userId) {
     peerConnection = new RTCPeerConnection(configuration);

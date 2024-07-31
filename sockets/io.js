@@ -1,5 +1,3 @@
-    const faker = require('faker');
-
     let num_users = 0;
     let waiting_list = [];
 
@@ -7,23 +5,22 @@
         io.on('connection', (socket) => {
             num_users++;
             socket.partner = null;
-            socket.username = 'anonymous-' + faker.name.firstName();
-            socket.emit("init", { username: socket.username, my_id: socket.id });
+            socket.emit("init", { my_id: socket.id });
 
             // Check if there are users in the waiting list and pair them up
             const tryPairing = () => {
-                if (socket.partner === null) {  // Only try to pair if this socket isn't already paired
-                    if (waiting_list.length > 0) {
-                        const partnerSocket = waiting_list.shift();
-                        if (partnerSocket.connected && partnerSocket.partner === null) {
+                if (socket.partner === null) {
+                    while (waiting_list.length > 0) {
+                        const partnerSocket = io.sockets.sockets.get(waiting_list.shift());
+                        if (partnerSocket && partnerSocket.connected && partnerSocket.partner === null) {
                             socket.partner = partnerSocket.id;
                             partnerSocket.partner = socket.id;
-                            socket.emit("partner", { id: partnerSocket.id, username: partnerSocket.username });
-                            partnerSocket.emit("partner", { id: socket.id, username: socket.username });
+                            socket.emit("partner", { id: partnerSocket.id });
+                            partnerSocket.emit("partner", { id: socket.id });
                             return;
                         }
                     }
-                    waiting_list.push(socket);  // Add to waiting list only if no partner found
+                    waiting_list.push(socket.id);  // Store socket.id instead of socket object
                 }
             };
 
@@ -33,9 +30,10 @@
 
             socket.on('chat message', (data) => {
                 const { msg, target } = data;
-                const source = socket.id;
-                socket.to(target).emit("chat message partner", msg);
-                io.to(source).emit("chat message mine", msg);
+                if (socket.partner === target) {
+                    socket.to(target).emit("chat message partner", msg);
+                    socket.emit("chat message mine", msg);
+                }
             });
 
             socket.on('join-room', (roomId) => {
@@ -60,11 +58,11 @@
                         partnerSocket.emit("disconnecting now", 'Your Partner has disconnected. Refresh the page to chat again');
                         partnerSocket.partner = null;
                         if (partnerSocket.connected) {
-                            waiting_list.push(partnerSocket);
+                            waiting_list.push(partnerSocket.id);
                         }
                     }
                 } else {
-                    const index = waiting_list.indexOf(socket);
+                    const index = waiting_list.indexOf(socket.id);
                     if (index !== -1) {
                         waiting_list.splice(index, 1);
                     }

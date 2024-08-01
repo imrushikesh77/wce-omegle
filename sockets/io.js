@@ -34,7 +34,7 @@ const ioHandler = (io) => {
         waiting_list.push(socket.id);
         tryPairing();
 
-        console.log(`User connected: ${socket.id}. Active Users: ${num_users}, Waiting List Size: ${waiting_list.length}`);
+        // console.log(`User connected: ${socket.id}. Active Users: ${num_users}, Waiting List Size: ${waiting_list.length}`);
 
         socket.on('chat message', (data) => {
             const { msg, target } = data;
@@ -50,7 +50,7 @@ const ioHandler = (io) => {
         });
 
         socket.on('send-signal', (data) => {
-            console.log(`Signal received from ${data.from} to ${data.to}`);
+            // console.log(`Signal received from ${data.from} to ${data.to}`);
             io.to(data.to).emit('signal-receive', {
                 signal: data.signal,
                 from: data.from
@@ -58,7 +58,7 @@ const ioHandler = (io) => {
         });
 
         socket.on('disconnect', () => {
-            console.log(`User disconnected: ${socket.id}`);
+            // console.log(`User disconnected: ${socket.id}`);
             if (socket.partner !== null) {
                 const partnerSocket = io.sockets.sockets.get(socket.partner);
                 if (partnerSocket) {
@@ -77,7 +77,7 @@ const ioHandler = (io) => {
                 }
             }
             num_users--;
-            console.log(`Active Users: ${num_users}, Waiting List Size: ${waiting_list.length}`);
+            // console.log(`Active Users: ${num_users}, Waiting List Size: ${waiting_list.length}`);
             tryPairing();
         });
 

@@ -145,6 +145,7 @@ socket.on('partner', function (partner_data) {
 
 // Cleanup on disconnect
 socket.on('disconnecting now', function (msg) {
+    alert(msg);
     messagesDiv.innerHTML += '<div class="partner">' + msg + "</div>";
     remoteVideo.srcObject = null;
     partner_id = null;
